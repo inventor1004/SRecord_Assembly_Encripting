@@ -9,8 +9,9 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 #include <stdbool.h>
+#include <stdlib.h>
+
 
 // #include "../inc/encodeToAssembly.h"
 // #include "../inc/encodeToSRecord.h"
@@ -26,12 +27,12 @@
 void encodeToAssembly(char inputFileName, char outputFileName); // intput 원본 /output 최종 적용한 이름
 void encodeToSRecord(char inputFileName, char outputFileName);
 void printUsage();
-
+char* readFile(char* inputFileName);
 
 int main(int argc, char* argv[])
 {
-    char inputFileName[MAX_FILENAME_LENGTH] = "";
-    char outputFileName[MAX_FILENAME_LENGTH] = "";
+    char inputFileName[MAX_FILENAME_LENGTH] = "\0";
+    char outputFileName[MAX_FILENAME_LENGTH] = "\0";
 
     char* option_i = "-i";
     char* option_h = "-h";
@@ -41,7 +42,7 @@ int main(int argc, char* argv[])
     bool is_Usage = false;
 
 
-    if (1 < argc || argc <= 5) {
+    if (argc <= 5) {
         for (int i = 1; i <= argc - 1; i++) {
             if (strncmp(argv[i], option_i, strlen(option_i)) == 0) {
                 strcpy(inputFileName, argv[i]);
@@ -59,11 +60,24 @@ int main(int argc, char* argv[])
         strcpy(inputFileName, inputFileName + 2);
         strcpy(outputFileName, outputFileName + 2);
 
-        if (inputFileName == NULL) {
-            // todo add stdin function - honggyu
+        // If the user does not enter the input file name
+        // Ask by stdin
+        // If output file name also not entered,
+        // Ask by stdin
+        if (inputFileName[0] == '\0') {
+            printf("Please enter input file name: ");
+            fgets(inputFileName, sizeof(inputFileName), stdin);
+
+            if (outputFileName[0] == '\0') {
+                printf("Please enter output file name: ");
+                fgets(outputFileName, sizeof(outputFileName), stdin);
+            }
         }
 
-        if (outputFileName == NULL) {
+        // If the user enter the input file name, but not enter the output file name,
+        // copy the entered input file name
+        // It will be processed later
+        if (outputFileName[0] == '\0') {
             strcpy(outputFileName, inputFileName);
         }
     }
@@ -78,9 +92,11 @@ int main(int argc, char* argv[])
 
 
     // todo intput data malloc - honggyu
-    // make malloc based on input file data
-
-
+    char *fileContents = readFile(inputFileName);
+    if(fileContents == NULL)
+    {
+        return -3;
+    }
 //    printf("intput: %s\n", inputFileName);
 //    printf("output: %s\n", outputFileName);
 //    printf("mode: %d\n", mode); // 1 is true, 0 is false
@@ -106,6 +122,7 @@ int main(int argc, char* argv[])
             return -2;
     }
 
+    free(fileContents);
     return 0;
 }
 
@@ -119,6 +136,48 @@ void encodeToSRecord(char inputFileName, char outputFileName) {
     // output file write -honggyu
 }
 
+char* readFile(char* inputFileName)
+{
+    FILE *file;
+    char *fileContents;
+    long file_size;
+
+    // open the input file
+    file = fopen(inputFileName, "rb"); // "rb": read binary file
+    if (file == NULL) {
+        perror("Error opening file");
+        return NULL;
+    }
+
+    // check the file size
+    fseek(file, 0, SEEK_END);
+    file_size = ftell(file);
+    rewind(file);
+
+    // Allocate the memory for storing the file contents
+    fileContents = (char *)calloc(file_size + 1, sizeof(char)); // +1 for null termination
+    if (fileContents == NULL) {
+        perror("Memory allocation failed");
+        fclose(file);
+        return NULL;
+    }
+
+    // Read the file
+    fread(fileContents, sizeof(char), file_size, file);
+    fileContents[file_size] = '\0'; // Add null termination at the end
+
+
+    printf("File content:\n%s\n", fileContents);
+
+    // close the file
+    if (fclose(file) == EOF) {
+        perror("Failed to close file");
+        exit(EXIT_FAILURE);
+        free(fileContents);
+    }
+
+    return fileContents;
+}
 
 void printUsage() {
     printf("\n");
