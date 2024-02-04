@@ -24,10 +24,11 @@
 
 
 
-void encodeToAssembly(char inputFileName, char outputFileName); // intput 원본 /output 최종 적용한 이름
-void encodeToSRecord(char inputFileName, char outputFileName);
+void encodeToAssembly(char** fileContents, char** outputFileName); // intput 원본 /output 최종 적용한 이름
+void encodeToSRecord(char** fileContents, char** outputFileName);
+bool checkExtension(const char *filename, const char *extension);
 char* readFile(char* inputFileName);
-void fileExtensionExtract(char* fileName, bool mode);
+char* fileExtensionExtract(char* fileName, bool mode);
 void printUsage();
 
 
@@ -88,55 +89,60 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    // todo fileextensionextract (.asm.srec)- jongeon
-    // make output final filename
 
-
-
-    // todo intput data malloc - honggyu
-    char *fileContents = readFile(inputFileName);
-    if(fileContents == NULL)
+    char *extendedOutputFileName = fileExtensionExtract(outputFileName, mode);
+    if(extendedOutputFileName == NULL)
     {
         return -3;
     }
-//    printf("intput: %s\n", inputFileName);
-//    printf("output: %s\n", outputFileName);
-//    printf("mode: %d\n", mode); // 1 is true, 0 is false
-//    printf("is_Usage: %d\n", is_Usage);
 
-
+    // Read the input file and store the contents to the fileContents
+    // readFile() will return a dynamic allocated
+    char *fileContents = readFile(inputFileName);
+    if(fileContents == NULL)
+    {
+        return -4;
+    }
 
 
     if (is_Usage == true) {
         printUsage();
     }
 
-    switch (mode)
+    if(mode)
     {
-        case MODE_ENCODE_SREC:
-//        encodeToSRecord(input, output);
-            break;
-        case MODE_ENCODE_ASM:
-//       encodeToAssembly(input, output);
-            break;
-        default:
-            printf("Error - Invalid option.");
-            return -2;
+        encodeToSRecord(&fileContents, &extendedOutputFileName);
+    }
+    else
+    {
+        encodeToAssembly(&fileContents, &extendedOutputFileName);
     }
 
+    // Free allocated memory
+    free(extendedOutputFileName);
     free(fileContents);
     return 0;
 }
 
 
 
-void encodeToAssembly(char inputFileName, char outputFileName) {
+void encodeToAssembly(char** fileContents, char** outputFileName) {
     // output file write - jongeon
 
 }
-void encodeToSRecord(char inputFileName, char outputFileName) {
+void encodeToSRecord(char** fileContents, char** outputFileName) {
     // output file write -honggyu
 }
+
+bool checkExtension(const char *filename, const char *extension)
+{
+    const char *dot = strrchr(filename, '.'); // Find the memory location of '.'
+    if (!dot || dot == filename) {
+        return false; // If there is no extension
+    }
+    return strcmp(dot, extension) == 0; // Check whether the extension is the same or not
+}
+
 
 char* readFile(char* inputFileName)
 {
@@ -144,8 +150,26 @@ char* readFile(char* inputFileName)
     char *fileContents;
     long file_size;
 
+    // Check the file extension and determine whether read the file as text or binary
+    if (checkExtension(inputFileName, ".txt"))
+    {
+        file = fopen(inputFileName, "r"); // "rb": read text file
+    }
+    else if (checkExtension(inputFileName, ".dot"))
+    {
+        file = fopen(inputFileName, "rb"); // "rb": read binary file
+    } else if (checkExtension(inputFileName, ".bin"))
+    {
+        file = fopen(inputFileName, "rb"); // "rb": read binary file
+    }
+    else
+    {
+        printf("The file has an unknown or no extension.\n");
+        return NULL;
+    }
+
     // open the input file
-    file = fopen(inputFileName, "rb"); // "rb": read binary file
+
     if (file == NULL) {
         perror("Error opening file");
         return NULL;
@@ -161,6 +185,7 @@ char* readFile(char* inputFileName)
     if (fileContents == NULL) {
         perror("Memory allocation failed");
         fclose(file);
+        free(fileContents);
         return NULL;
     }
 
@@ -174,16 +199,17 @@ char* readFile(char* inputFileName)
     // close the file
     if (fclose(file) == EOF) {
         perror("Failed to close file");
-        exit(EXIT_FAILURE);
         free(fileContents);
+        exit(EXIT_FAILURE);
     }
 
     return fileContents;
 }
 
-void fileExtensionExtract(char* fileName, bool mode) {
+char* fileExtensionExtract(char* fileName, bool mode)
+{
     // need to handle empty output fileName
-    // if there is no output fileName, we need to make a vilid function that it is null or not.
+    // if there is no output fileName, we need to make a valid function that it is null or not.
     // if we want to handle that in this function, we add more one parameter for copy input name to output name.
     char extension[6] = "";
     char *dot = strrchr(fileName, '.');
@@ -196,10 +222,10 @@ void fileExtensionExtract(char* fileName, bool mode) {
 
     if (dot != NULL) {
         if (strcmp(dot, ".asm") == 0 || strcmp(dot, ".srec") == 0 ) {
-            if (strcmp(dot, ".asm") == 0 && mode == true) {
+            if (strcmp(dot, ".asm") == 0 && mode == MODE_ENCODE_SREC) {
                 strcat(fileName, extension);
             }
-            else if (strcmp(dot, ".srec") == 0 && mode == false) {
+            else if (strcmp(dot, ".srec") == 0 && mode == MODE_ENCODE_ASM) {
                 strcat(fileName, extension);
             }
         }
@@ -210,6 +236,16 @@ void fileExtensionExtract(char* fileName, bool mode) {
     else {
         strcat(fileName, extension);
     }
+
+    unsigned int fileNameLen = strlen(fileName);
+    char *outputFileName = (char *)calloc(fileNameLen + 1, sizeof(char)); // +1 for null termination
+    if (outputFileName == NULL) {
+        perror("Memory allocation failed");
+        free(outputFileName);
+        return NULL;
+    }
+
+    return fileName;
 }
 
 void printUsage() {
