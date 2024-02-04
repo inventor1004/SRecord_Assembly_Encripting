@@ -26,8 +26,10 @@
 
 void encodeToAssembly(char inputFileName, char outputFileName); // intput 원본 /output 최종 적용한 이름
 void encodeToSRecord(char inputFileName, char outputFileName);
-void printUsage();
 char* readFile(char* inputFileName);
+void fileExtensionExtract(char* fileName, bool mode);
+void printUsage();
+
 
 int main(int argc, char* argv[])
 {
@@ -177,6 +179,37 @@ char* readFile(char* inputFileName)
     }
 
     return fileContents;
+}
+
+void fileExtensionExtract(char* fileName, bool mode) {
+    // need to handle empty output fileName
+    // if there is no output fileName, we need to make a vilid function that it is null or not.
+    // if we want to handle that in this function, we add more one parameter for copy input name to output name.
+    char extension[6] = "";
+    char *dot = strrchr(fileName, '.');
+
+    if (mode) {
+        strcpy(extension,".srec");
+    } else {
+        strcpy(extension,".asm");
+    }
+
+    if (dot != NULL) {
+        if (strcmp(dot, ".asm") == 0 || strcmp(dot, ".srec") == 0 ) {
+            if (strcmp(dot, ".asm") == 0 && mode == true) {
+                strcat(fileName, extension);
+            }
+            else if (strcmp(dot, ".srec") == 0 && mode == false) {
+                strcat(fileName, extension);
+            }
+        }
+        else {
+            strcat(fileName, extension);
+        }
+    }
+    else {
+        strcat(fileName, extension);
+    }
 }
 
 void printUsage() {
