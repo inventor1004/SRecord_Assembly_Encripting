@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include "fileIO.h"
 
 // #include "../inc/encodeToAssembly.h"
 // #include "../inc/encodeToSRecord.h"
@@ -26,8 +27,6 @@
 
 void encodeToAssembly(char** fileContents, char** outputFileName); // intput 원본 /output 최종 적용한 이름
 void encodeToSRecord(char** fileContents, char** outputFileName);
-bool checkExtension(const char *filename, const char *extension);
-char* readFile(char* inputFileName);
 char* fileExtensionExtract(char* fileName, bool mode);
 void printUsage();
 
@@ -134,77 +133,7 @@ void encodeToSRecord(char** fileContents, char** outputFileName) {
     // output file write -honggyu
 }
 
-bool checkExtension(const char *filename, const char *extension)
-{
-    const char *dot = strrchr(filename, '.'); // Find the memory location of '.'
-    if (!dot || dot == filename) {
-        return false; // If there is no extension
-    }
-    return strcmp(dot, extension) == 0; // Check whether the extension is the same or not
-}
 
-
-char* readFile(char* inputFileName)
-{
-    FILE *file;
-    char *fileContents;
-    long file_size;
-
-    // Check the file extension and determine whether read the file as text or binary
-    if (checkExtension(inputFileName, ".txt"))
-    {
-        file = fopen(inputFileName, "r"); // "rb": read text file
-    }
-    else if (checkExtension(inputFileName, ".dot"))
-    {
-        file = fopen(inputFileName, "rb"); // "rb": read binary file
-    } else if (checkExtension(inputFileName, ".bin"))
-    {
-        file = fopen(inputFileName, "rb"); // "rb": read binary file
-    }
-    else
-    {
-        printf("The file has an unknown or no extension.\n");
-        return NULL;
-    }
-
-    // open the input file
-
-    if (file == NULL) {
-        perror("Error opening file");
-        return NULL;
-    }
-
-    // check the file size
-    fseek(file, 0, SEEK_END);
-    file_size = ftell(file);
-    rewind(file);
-
-    // Allocate the memory for storing the file contents
-    fileContents = (char *)calloc(file_size + 1, sizeof(char)); // +1 for null termination
-    if (fileContents == NULL) {
-        perror("Memory allocation failed");
-        fclose(file);
-        free(fileContents);
-        return NULL;
-    }
-
-    // Read the file
-    fread(fileContents, sizeof(char), file_size, file);
-    fileContents[file_size] = '\0'; // Add null termination at the end
-
-
-    printf("File content:\n%s\n", fileContents);
-
-    // close the file
-    if (fclose(file) == EOF) {
-        perror("Failed to close file");
-        free(fileContents);
-        exit(EXIT_FAILURE);
-    }
-
-    return fileContents;
-}
 
 char* fileExtensionExtract(char* fileName, bool mode)
 {
