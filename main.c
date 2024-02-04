@@ -6,13 +6,13 @@
 * Date          : Feb 4, 2024
 * Description   :
 */
+#include "fileIO.h"
+#include "SRecordEncode.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
 #include <stdlib.h>
-
-#include "fileIO.h"
 
 // #include "../inc/encodeToAssembly.h"
 // #include "../inc/encodeToSRecord.h"
@@ -26,7 +26,6 @@
 
 
 void encodeToAssembly(char** fileContents, char** outputFileName); // intput 원본 /output 최종 적용한 이름
-void encodeToSRecord(char** fileContents, char** outputFileName);
 char* fileExtensionExtract(char* fileName, bool mode);
 void printUsage();
 
@@ -129,10 +128,6 @@ void encodeToAssembly(char** fileContents, char** outputFileName) {
     // output file write - jongeon
 
 }
-void encodeToSRecord(char** fileContents, char** outputFileName) {
-    // output file write -honggyu
-}
-
 
 
 char* fileExtensionExtract(char* fileName, bool mode)
@@ -168,13 +163,14 @@ char* fileExtensionExtract(char* fileName, bool mode)
 
     unsigned int fileNameLen = strlen(fileName);
     char *outputFileName = (char *)calloc(fileNameLen + 1, sizeof(char)); // +1 for null termination
+    strcat(outputFileName, fileName);
     if (outputFileName == NULL) {
         perror("Memory allocation failed");
         free(outputFileName);
         return NULL;
     }
 
-    return fileName;
+    return outputFileName;
 }
 
 void printUsage() {

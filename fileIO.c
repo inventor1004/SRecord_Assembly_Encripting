@@ -3,20 +3,7 @@
 //
 #include <stdio.h>
 #include <string.h>
-#include <stdbool.h>
 #include <stdlib.h>
-
-#include "fileIO.h"
-
-bool checkExtension(const char *filename, const char *extension)
-{
-    const char *dot = strrchr(filename, '.'); // Find the memory location of '.'
-    if (!dot || dot == filename) {
-        return false; // If there is no extension
-    }
-    return strcmp(dot, extension) == 0; // Check whether the extension is the same or not
-}
-
 
 char* readFile(char* inputFileName)
 {
