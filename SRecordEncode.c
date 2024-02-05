@@ -3,6 +3,7 @@
 //
 
 #include "SRecordEncode.h"
+#include "fileIO.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -22,9 +23,13 @@ unsigned char calculateChecksum(int count, char* address, char* data)
     sum += (char)count;
     sum += strtol(address, NULL, 16);
 
-    for (int i = 0; i < strlen(data); ++i) {
-        sum += data[i];
-        if(data[i+1] == '\0') break;
+    for (int i = 0; i < strlen(data); i += 2) {
+        char ASCII[3] = "";
+        ASCII[0] = data[i];
+        ASCII[1] = data[i+1];
+        ASCII[2] = '\0';
+
+        sum += (int)strtol(ASCII, NULL, MAX_BYTES);
     }
 
     int onesComplement = ~sum;
@@ -69,7 +74,7 @@ char* stringToASCII(char *string)
 void encodeToSRecord(char** fileContents, char** outputFileName)
 {
     // calculate how many s1 should be generated
-    int contentsBytes = strlen(*fileContents);
+    int contentsBytes = strlen(*fileContents) / 2;
     int numberOfS1 = 0;
     int S1TotalSize = 0;
     if (contentsBytes % MAX_BYTES != 0) {
@@ -134,6 +139,7 @@ void encodeToSRecord(char** fileContents, char** outputFileName)
     int sizeCount = strlen(*fileContents);
     int indexCount = 0;
     int i = 0;
+    bool newLine = false;
     while (sizeCount > 0)
     {
         // Accumulate "S1"
@@ -168,33 +174,37 @@ void encodeToSRecord(char** fileContents, char** outputFileName)
         // Accumulate & Update memory address
         strcat(S1, memoryAddress);
 
-        bool test = true;
         char *inputdata = *fileContents;
         char tmp[MAX_BYTES+1] = "\0";
         int j = 0;
-        while(inputdata[i] != '\0')
+        while(i <= strlen(*fileContents))
         {
-            char hexStr[6]="";
-            sprintf(hexStr, "%02X", inputdata[i]);
+            char hexStr[3]="";
+            hexStr[0] = inputdata[i];
+            hexStr[1] = inputdata[i+1];
+            hexStr[2] = '\0';
 
-            if (i % MAX_BYTES == 15 || inputdata[i+1] == '\0') {
-                strcat(S1, hexStr);
-                tmp[j] = inputdata[i];
-                if (inputdata[i+1] != '\0') {
-                    ++i;
-                    ++j;
-                    break;
-                }
-            }
-            else {
-                strcat(S1, hexStr);
-                tmp[j] = inputdata[i];
-            }
-            ++i;
-            ++j;
 
+            if ( ( i % (MAX_BYTES*2) == 0) && i != 0 && newLine == false)
+            {
+                newLine = true;
+                tmp[j] = '\0';
+                break;
+            }
+
+            strcat(S1, hexStr);
+            tmp[j] = inputdata[i];
+            tmp[j+1] = inputdata[i+1];
+
+            i += 2;
+            j += 2;
+            newLine = false;
         }
         // Calculate & Accumulate Check Sum
+        if (sizeCount < MAX_BYTES*2)
+        {
+            byteLength = SIZE_OF_ADDRESS + sizeCount/2 + SIZE_OF_CHECKSUM;
+        }
         unsigned char checkSum = calculateChecksum(byteLength, memoryAddress, tmp);
         char checksumStr[3]; // CheckSum = 2 digits + "/0"
         sprintf(checksumStr, "%02X", checkSum);
@@ -202,7 +212,7 @@ void encodeToSRecord(char** fileContents, char** outputFileName)
         strcat(S1, "\n");
 
         snprintf(memoryAddress, SIZE_OF_ADDRESS*2 + 1, "%04X", address);
-        sizeCount -= MAX_BYTES;
+        sizeCount -= MAX_BYTES*2;
     }
 
 
@@ -231,6 +241,12 @@ void encodeToSRecord(char** fileContents, char** outputFileName)
     /*-- Process s9 --------------------------------------------------------*/
     /*----------------------------------------------------------------------*/
     strcpy(S9, "S9030000FC");
-    
+
+    // Writing a file
+    writeFile(S0, *outputFileName);
+    appendToFile(S1, *outputFileName);
+    appendToFile(S5, *outputFileName);
+    appendToFile(S9, *outputFileName);
+
     free(S1);
 }
