@@ -122,10 +122,32 @@ int main(int argc, char* argv[])
     return 0;
 }
 
+void encodeToAssembly(char** fileContents, char** outputFileName)
+{
+    // file open and close 만들어야함.
 
+    char *inputdata = *fileContents; // intput example
+    char outputdata[256] = "";
 
-void encodeToAssembly(char** fileContents, char** outputFileName) {
-    // output file write - jongeon
+    strcat(outputdata, "dc.b\t");
+
+    for(int i = 0; inputdata[i] != '\0'; i++) {
+        char hexStr[6]="";
+        sprintf(hexStr, "$%02X", inputdata[i]);
+
+        if (i % 16 == 15 || inputdata[i+1] == '\0') {
+            strcat(outputdata, hexStr);
+            if (inputdata[i+1] != '\0') {
+                strcat(outputdata, "\ndc.b\t");
+            }
+        }
+        else {
+            strcat(hexStr, ", ");
+            strcat(outputdata, hexStr);
+        }
+    }
+
+    printf("%s\n", outputdata); // final value is outputdata
 
 }
 

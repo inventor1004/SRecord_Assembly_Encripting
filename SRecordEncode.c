@@ -6,57 +6,44 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <stdbool.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #define AUTHOR_NAME "JONGEON-HONGGYU"
 
 #define MAX_SREC_LEN 42
-#define MAX_CHARS    8
 #define MAX_BYTES    16
-#define SIZE_OF_CHECKSUM 2
-#define SIZE_OF_ADDRESS  4
+#define SIZE_OF_CHECKSUM 1
+#define SIZE_OF_ADDRESS  2
 
-char calculateChecksum(const char *record, int length)
+unsigned char calculateChecksum(int count, char* address, char* data)
 {
-    unsigned int sum = 0;
-    while (length > 1) {
-        unsigned int value;
-        sscanf(record, "%2x", &value);
-        sum += value;
-        record += 2;
-        length -= 2;
+    int sum = 0;
+    sum += (char)count;
+    sum += strtol(address, NULL, 16);
+
+    for (int i = 0; i < strlen(data); ++i) {
+        sum += data[i];
+        if(data[i+1] == '\0') break;
     }
-    return (unsigned char)(~sum);
+
+    int onesComplement = ~sum;
+    int lastTwoDigits = onesComplement & 0xFF;
+
+    return (char)lastTwoDigits;
 }
 
-char* decimalToHexadecimal(int decimal)
-{
-    char hex[9];   // The maximum hexadecimal length of a 32-bit integer is 8 digits + the null character.
-    int index = 0; // Current memory
-
-    while(decimal != 0) {
-        int temp = 0;
-        temp = decimal % 16;
-
-        if(temp < 10) {
-            hex[index] = temp + 48; // ASCII '0' = 48
-        } else {
-            hex[index] = temp + 55; // ASCII 'A' = 65, A~F = 10~15
-        }
-
-        index++;
-        decimal = decimal / 16;
-    }
-
-    hex[index] = '\0'; // Add NULL termination
-
-    char *hexadecimal = calloc(strlen(hex), sizeof(char));
+char* decimalToHexadecimal(int decimal) {
+    // 2자리 16진수 + 널 종료 문자를 위한 공간 할당
+    char *hexadecimal = calloc(3, sizeof(char));
     if (hexadecimal == NULL) {
         perror("Memory allocation failed");
         return NULL;
     }
-    strcpy(hexadecimal, hex);
+
+    // decimal 값을 2자리 16진수로 변환하여 저장
+    sprintf(hexadecimal, "%02X", decimal);
+
     return hexadecimal;
 }
 
@@ -82,11 +69,12 @@ char* stringToASCII(char *string)
 void encodeToSRecord(char** fileContents, char** outputFileName)
 {
     // calculate how many s1 should be generated
-    int contentsBytes = strlen(*fileContents) * 2;
+    int contentsBytes = strlen(*fileContents);
     int numberOfS1 = 0;
     int S1TotalSize = 0;
     if (contentsBytes % MAX_BYTES != 0) {
         numberOfS1 = contentsBytes / MAX_BYTES + 1;
+
     } else {
         numberOfS1 = contentsBytes / MAX_BYTES;
     }
@@ -96,14 +84,15 @@ void encodeToSRecord(char** fileContents, char** outputFileName)
 
     // Prepare s-records
     char S0[MAX_SREC_LEN] = "\0";
-    char *S1= calloc(S1TotalSize, sizeof(char));
+    char *S1= calloc(S1TotalSize + numberOfS1, sizeof(char));
     if (S1 == NULL) {
         perror("Memory allocation failed");
         return;
     }
     char S5[MAX_SREC_LEN] = "\0";
     char S9[MAX_SREC_LEN] = "\0";
-    char memoryAddress[SIZE_OF_ADDRESS + 1] = {'0', '0', '0', '0'};
+    char memoryAddress[SIZE_OF_ADDRESS*2 + 1] = {'0', '0', '0', '0'};
+
 
     /*----------------------------------------------------------------------*/
     /*-- Process s0 --------------------------------------------------------*/
@@ -129,10 +118,11 @@ void encodeToSRecord(char** fileContents, char** outputFileName)
         strcat(S0, ASCII); // add ASCII code record
 
         // Calculate & Accumulate Check Sum
-        unsigned char checkSum = calculateChecksum(ASCII, byteLength);
+        unsigned char checkSum = calculateChecksum(byteLength, memoryAddress, AUTHOR_NAME);
         char checksumStr[3]; // CheckSum = 2 digits + "/0"
         sprintf(checksumStr, "%02X", checkSum);
         strcat(S0, checksumStr);
+        strcat(S0, "\n");
 
         free(ASCII);
     }
@@ -143,28 +133,29 @@ void encodeToSRecord(char** fileContents, char** outputFileName)
     /*----------------------------------------------------------------------*/
     int sizeCount = strlen(*fileContents);
     int indexCount = 0;
+    int i = 0;
     while (sizeCount > 0)
     {
-        // Accumulate "S1" and memory address
-        snprintf(S1, S1TotalSize, "S1%s", memoryAddress);
+        // Accumulate "S1"
+        strcat(S1, "S1");
+
+        unsigned int address;
+        // Check whether the data size is larger than 16 bytes, and
+        // if so, truncate it to 16 bytes and save it.
 
         // Prepare to update the memory address
         // Convert address in string to integer
-        unsigned int address;
         sscanf(memoryAddress, "%x", &address);
 
-        // Check whether the data size is larger than 16 bytes, and
-        // if so, truncate it to 16 bytes and save it.
         if(sizeCount > MAX_BYTES) {
-            byteLength = MAX_BYTES + SIZE_OF_CHECKSUM + SIZE_OF_ADDRESS;
+            byteLength = MAX_BYTES + (SIZE_OF_CHECKSUM + SIZE_OF_ADDRESS);
             // Add 16 bytes
             address += MAX_BYTES;
         }
         else {
-            byteLength = sizeCount + SIZE_OF_CHECKSUM + SIZE_OF_ADDRESS;
+            byteLength = sizeCount + (SIZE_OF_CHECKSUM + SIZE_OF_ADDRESS);
             address += sizeCount;
         }
-        snprintf(memoryAddress, SIZE_OF_ADDRESS+1, "%04X", address);
 
         // Accumulate LL code to S1
         char *hexadecimal = decimalToHexadecimal(byteLength);
@@ -174,10 +165,72 @@ void encodeToSRecord(char** fileContents, char** outputFileName)
             free(hexadecimal);
         }
 
+        // Accumulate & Update memory address
+        strcat(S1, memoryAddress);
 
+        bool test = true;
+        char *inputdata = *fileContents;
+        char tmp[MAX_BYTES+1] = "\0";
+        int j = 0;
+        while(inputdata[i] != '\0')
+        {
+            char hexStr[6]="";
+            sprintf(hexStr, "%02X", inputdata[i]);
 
+            if (i % MAX_BYTES == 15 || inputdata[i+1] == '\0') {
+                strcat(S1, hexStr);
+                tmp[j] = inputdata[i];
+                if (inputdata[i+1] != '\0') {
+                    ++i;
+                    ++j;
+                    break;
+                }
+            }
+            else {
+                strcat(S1, hexStr);
+                tmp[j] = inputdata[i];
+            }
+            ++i;
+            ++j;
+
+        }
+        // Calculate & Accumulate Check Sum
+        unsigned char checkSum = calculateChecksum(byteLength, memoryAddress, tmp);
+        char checksumStr[3]; // CheckSum = 2 digits + "/0"
+        sprintf(checksumStr, "%02X", checkSum);
+        strcat(S1, checksumStr);
+        strcat(S1, "\n");
+
+        snprintf(memoryAddress, SIZE_OF_ADDRESS*2 + 1, "%04X", address);
         sizeCount -= MAX_BYTES;
     }
 
+
+    /*----------------------------------------------------------------------*/
+    /*-- Process s5 --------------------------------------------------------*/
+    /*----------------------------------------------------------------------*/
+    strcat(S5, "S503");
+    char hexNumberOfS1[4] = "";
+    sprintf(hexNumberOfS1, "%04X", numberOfS1);
+    strcat(S5, hexNumberOfS1);
+
+
+    int sum = 3 + numberOfS1;
+    sum = ~sum;
+    sum = sum & 0xFF;
+    char temp[256];
+    sprintf(temp, "%d\n", sum);
+    sprintf(hexNumberOfS1, "%02X", sum);
+
+    strcat(S5, hexNumberOfS1);
+    strcat(S5, "\n");
+
+    sizeCount -= MAX_BYTES;
+
+    /*----------------------------------------------------------------------*/
+    /*-- Process s9 --------------------------------------------------------*/
+    /*----------------------------------------------------------------------*/
+    strcpy(S9, "S9030000FC");
+    
     free(S1);
 }
